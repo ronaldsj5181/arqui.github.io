@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis Interactivo de Arquitecturas de SO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --secondary: #3b82f6;
+            --accent: #f59e0b;
+            --monolithic: #ef4444;
+            --layered: #3b82f6;
+            --client-server: #10b981;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+            scroll-behavior: smooth;
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, var(--primary), #1d4ed8);
+        }
+        
+        .nav-link {
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .nav-link.active {
+            border-bottom-color: var(--accent);
+            color: var(--accent);
+        }
+        
+        .architecture-tab {
+            transition: all 0.3s ease;
+        }
+        
+        .architecture-tab.active {
+            background-color: var(--secondary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        .diagram-box {
+            border: 2px solid;
+            padding: 0.75rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .monolithic-diagram {
+            border-color: var(--monolithic);
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+        
+        .layered-diagram {
+            border-color: var(--layered);
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        .client-server-diagram {
+            border-color: var(--client-server);
+            background-color: rgba(16, 185, 129, 0.1);
+        }
+        
+        .pros-card {
+            background-color: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid var(--client-server);
+        }
+        
+        .cons-card {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--monolithic);
+        }
+        
+        .analogy-card {
+            background-color: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--accent);
+        }
+        
+        .timeline-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: var(--secondary);
+            border: 3px solid white;
+            position: absolute;
+            left: -10px;
+            top: 0;
+        }
+        
+        .timeline-content {
+            transition: all 0.3s ease;
+            max-height: 0;
+            overflow: hidden;
+        }
+        
+        .timeline-item.active .timeline-content {
+            max-height: 500px;
+        }
+        
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .accordion.active .accordion-content {
+            max-height: 500px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 50vh;
+            max-height: 500px;
+            width: 100%;
+        }
+        
+        .floating-nav {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 100;
+            background-color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .floating-nav:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen">
+    <!-- Floating Navigation -->
+    <div class="floating-nav" id="menuButton">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobileMenu" class="fixed inset-0 bg-black bg-opacity-80 z-50 hidden">
+        <div class="absolute right-4 top-4 text-white cursor-pointer" id="closeMenu">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </div>
+        <div class="flex flex-col h-full justify-center items-center space-y-6">
+            <a href="#inicio" class="text-white text-2xl font-medium py-2 nav-link-mobile" data-target="inicio">Inicio</a>
+            <a href="#arquitecturas" class="text-white text-2xl font-medium py-2 nav-link-mobile" data-target="arquitecturas">Arquitecturas</a>
+            <a href="#comparativa" class="text-white text-2xl font-medium py-2 nav-link-mobile" data-target="comparativa">Comparativa</a>
+            <a href="#evolucion" class="text-white text-2xl font-medium py-2 nav-link-mobile" data-target="evolucion">Evolución</a>
+            <a href="#conclusion" class="text-white text-2xl font-medium py-2 nav-link-mobile" data-target="conclusion">Conclusión</a>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header-gradient text-white shadow-xl">
+        <div class="container mx-auto px-4 py-12 text-center">
+            <h1 class="text-4xl md:text-6xl font-bold mb-4">Análisis Comparativo de Arquitecturas de SO</h1>
+            <p class="text-xl md:text-3xl max-w-1xl mx-auto">Explora interactivamente las estructuras Monolítica, Jerárquica y Cliente-Servidor</p>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-40">
+        <div class="container mx-auto px-4">
+            <div class="hidden md:flex justify-center space-x-1 md:space-x-8 py-3">
+                <a href="#inicio" class="nav-link py-4 px-2 font-semibold text-lg active" data-target="inicio">Inicio</a>
+                <a href="#arquitecturas" class="nav-link py-4 px-2 font-semibold text-lg" data-target="arquitecturas">Arquitecturas</a>
+                <a href="#comparativa" class="nav-link py-4 px-2 font-semibold text-lg" data-target="comparativa">Comparativa</a>
+                <a href="#evolucion" class="nav-link py-4 px-2 font-semibold text-lg" data-target="evolucion">Evolución</a>
+                <a href="#conclusion" class="nav-link py-4 px-2 font-semibold text-lg" data-target="conclusion">Conclusión</a>
+            </div>
+            <div class="md:hidden flex justify-center py-3">
+                <span class="font-semibold">Explorador de Arquitecturas de SO</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Inicio Section -->
+        <section id="inicio" class="section active">
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-4">Importancia de la Arquitectura del SO</h2>
+                    <p class="text-slate-700 mb-4">La estructura interna de un Sistema Operativo (SO) es fundamental para su rendimiento, seguridad y fiabilidad. Este análisis explora tres modelos arquitectónicos clave que han definido la evolución de los sistemas operativos.</p>
+                    
+                    <div class="grid md:grid-cols-2 gap-6 mt-8">
+                        <div class="bg-blue-50 p-6 rounded-lg">
+                            <h3 class="text-xl font-bold text-blue-800 mb-3">Objetivo del Estudio</h3>
+                            <p class="text-slate-700">Proporcionar una comprensión profunda de las ventajas, desventajas y características de cada arquitectura para facilitar la selección del modelo adecuado según los requisitos específicos.</p>
+                        </div>
+                        <div class="bg-amber-50 p-6 rounded-lg">
+                            <h3 class="text-xl font-bold text-amber-800 mb-3">Pregunta Clave</h3>
+                            <p class="text-slate-700">¿Cuáles son las implicaciones prácticas de las estructuras Monolítica, Jerárquica y Cliente-Servidor en términos de rendimiento, seguridad y mantenibilidad?</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-6 mt-8">
+                    <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-2xl font-bold text-red-600">M</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">Monolítica</h3>
+                        <p class="text-slate-600">Todo el SO funciona como un único programa en modo kernel, con componentes fuertemente entrelazados.</p>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-2xl font-bold text-blue-600">J</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">Jerárquica</h3>
+                        <p class="text-slate-600">Organiza el SO en capas superpuestas, cada una construida sobre la inferior.</p>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-2xl font-bold text-green-600">C-S</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">Cliente-Servidor</h3>
+                        <p class="text-slate-600">Minimiza las funciones en modo kernel (microkernel), implementando servicios como procesos en modo usuario.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Arquitecturas Section -->
+        <section id="arquitecturas" class="section">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-slate-900">Paradigmas Arquitectónicos</h2>
+                <p class="text-slate-600 mt-2">Explora en detalle cada arquitectura, sus principios de diseño y ejemplos del mundo real.</p>
+                
+                <div class="inline-flex bg-slate-100 rounded-lg p-1 mt-6">
+                    <button class="architecture-tab px-4 py-2 rounded-md font-medium" data-arch="monolitica">Monolítica</button>
+                    <button class="architecture-tab px-4 py-2 rounded-md font-medium" data-arch="jerarquica">Jerárquica</button>
+                    <button class="architecture-tab px-4 py-2 rounded-md font-medium" data-arch="clienteservidor">Cliente-Servidor</button>
+                </div>
+            </div>
+            
+            <div id="arch-content" class="bg-white rounded-xl shadow-lg p-6">
+                <!-- Content will be loaded dynamically via JS -->
+            </div>
+        </section>
+
+        <!-- Comparativa Section -->
+        <section id="comparativa" class="section">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-slate-900">Análisis Comparativo</h2>
+                <p class="text-slate-600 mt-2">Visualiza las diferencias entre arquitecturas y cómo impactan en características clave.</p>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h3 class="text-2xl font-bold text-slate-900 mb-4 text-center">Visualización de Atributos</h3>
+                <div class="chart-container">
+                    <canvas id="comparisonRadarChart"></canvas>
+                </div>
+                <p class="text-center text-slate-500 mt-4">Pasa el cursor sobre los puntos para ver detalles del análisis</p>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-2xl font-bold text-slate-900 mb-4 text-center">Tabla Comparativa Detallada</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="bg-slate-100">
+                                <th class="py-3 px-4 text-left font-semibold text-slate-700">Característica</th>
+                                <th class="py-3 px-4 text-left font-semibold text-slate-700">Monolítica</th>
+                                <th class="py-3 px-4 text-left font-semibold text-slate-700">Jerárquica</th>
+                                <th class="py-3 px-4 text-left font-semibold text-slate-700">Cliente-Servidor</th>
+                                <th class="py-3 px-4 text-left font-semibold text-slate-700">Híbrida</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="py-3 px-4 border-b border-slate-200 font-medium">Rendimiento</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Muy Alto</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-yellow-600 font-medium">Medio</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-yellow-600 font-medium">Medio-Bajo</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alto</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 border-b border-slate-200 font-medium">Fiabilidad</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-red-600 font-medium">Baja</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-yellow-600 font-medium">Media</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Muy Alta</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 border-b border-slate-200 font-medium">Seguridad</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-red-600 font-medium">Baja</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-yellow-600 font-medium">Media</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 border-b border-slate-200 font-medium">Modularidad</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-red-600 font-medium">Baja</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Muy Alta</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 border-b border-slate-200 font-medium">Mantenibilidad</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-red-600 font-medium">Baja</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-green-600 font-medium">Alta</td>
+                                <td class="py-3 px-4 border-b border-slate-200 text-yellow-600 font-medium">Media</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 border-b border-slate-200 font-medium">Ejemplos</td>
+                                <td class="py-3 px-4 border-b border-slate-200">Linux, UNIX</td>
+                                <td class="py-3 px-4 border-b border-slate-200">THE, MULTICS</td>
+                                <td class="py-3 px-4 border-b border-slate-200">QNX, MINIX</td>
+                                <td class="py-3 px-4 border-b border-slate-200">Windows, macOS</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Evolución Section -->
+        <section id="evolucion" class="section">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-slate-900">Evolución Histórica</h2>
+                <p class="text-slate-600 mt-2">Descubre los hitos clave en el desarrollo de las arquitecturas de sistemas operativos.</p>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h3 class="text-2xl font-bold text-slate-900 mb-6 text-center">Línea de Tiempo</h3>
+                
+                <div class="relative pl-8 border-l-2 border-blue-300 ml-4">
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">1940s-1950s: Primeros Comienzos</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Ordenadores sin SO formal; programas cargados manualmente. GM-NAA I/O introduce procesamiento por lotes.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">1960s: Multiprogramación</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Sistemas como CTSS y MULTICS introducen tiempo compartido y multiprogramación.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">1971: UNIX</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Revoluciona el diseño de SO con su simplicidad, portabilidad y capacidad multitarea.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">1982: QNX</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Uno de los primeros microkernels comerciales exitosos para sistemas de tiempo real.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">1991: Linux</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Nace como kernel monolítico de código abierto, se convierte en pilar de la computación moderna.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">1993: Windows NT</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Introduce arquitectura de kernel híbrido combinando velocidad monolítica con modularidad.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item mb-10 relative">
+                        <div class="timeline-dot"></div>
+                        <h4 class="text-xl font-bold text-slate-900">2007: iOS & Android</h4>
+                        <div class="timeline-content">
+                            <p class="text-slate-600 mt-2">Redefinen la interacción con SO móviles optimizados para dispositivos táctiles.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-2xl font-bold text-slate-900 mb-6 text-center">Tendencias Futuras</h3>
+                
+                <div class="space-y-4">
+                    <div class="accordion bg-slate-50 rounded-lg overflow-hidden">
+                        <div class="accordion-header p-4 font-semibold text-slate-900 bg-slate-100 cursor-pointer flex justify-between">
+                            <span>Exokernels</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="p-4 text-slate-700">
+                                <p>Minimizan la abstracción del kernel, trasladando la gestión de recursos a las aplicaciones. Ofrecen máximo rendimiento pero aumentan la complejidad para los desarrolladores.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion bg-slate-50 rounded-lg overflow-hidden">
+                        <div class="accordion-header p-4 font-semibold text-slate-900 bg-slate-100 cursor-pointer flex justify-between">
+                            <span>Unikernels</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="p-4 text-slate-700">
+                                <p>Sistemas ultra-especializados que compilan aplicación + partes necesarias del SO en una única imagen. Ideales para la nube, con tiempos de arranque rápidos y tamaño mínimo.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion bg-slate-50 rounded-lg overflow-hidden">
+                        <div class="accordion-header p-4 font-semibold text-slate-900 bg-slate-100 cursor-pointer flex justify-between">
+                            <span>Computación en la Nube</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="p-4 text-slate-700">
+                                <p>SOs diseñados específicamente para entornos cloud con virtualización avanzada, contenedores y aplicaciones cloud-native.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion bg-slate-50 rounded-lg overflow-hidden">
+                        <div class="accordion-header p-4 font-semibold text-slate-900 bg-slate-100 cursor-pointer flex justify-between">
+                            <span>Impacto de la IA</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="p-4 text-slate-700">
+                                <p>Integración de asistentes inteligentes y optimización proactiva del rendimiento mediante aprendizaje automático.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Conclusión Section -->
+        <section id="conclusion" class="section">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-3xl font-bold text-slate-900 mb-6 text-center">Conclusiones y Recomendaciones</h2>
+                
+                <div class="grid md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-red-50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold text-red-800 mb-3">Monolítica</h3>
+                        <p class="text-slate-700">Ideal cuando el rendimiento es crítico (HPC, gaming). Requiere gestión cuidadosa de la complejidad.</p>
+                        <div class="mt-4">
+                            <h4 class="font-semibold">Recomendación:</h4>
+                            <p>Utilizar módulos cargables para aumentar la flexibilidad (ej: Linux LKMs).</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold text-blue-800 mb-3">Jerárquica</h3>
+                        <p class="text-slate-700">Menos común en estado puro hoy, pero sus principios de abstracción influyen en SOs modernos.</p>
+                        <div class="mt-4">
+                            <h4 class="font-semibold">Recomendación:</h4>
+                            <p>Aplicar diseño por capas dentro de componentes grandes para mejorar estructura.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-6 rounded-lg">
+                        <h3 class="text-xl font-bold text-green-800 mb-3">Cliente-Servidor</h3>
+                        <p class="text-slate-700">Óptima para sistemas críticos donde la fiabilidad y seguridad son primordiales.</p>
+                        <div class="mt-4">
+                            <h4 class="font-semibold">Recomendación:</h4>
+                            <p>Evaluar microkernels modernos (QNX, L4) para sistemas embebidos críticos.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-50 p-6 rounded-lg">
+                    <h3 class="text-xl font-bold text-slate-800 mb-3">Tendencias Actuales</h3>
+                    <p class="text-slate-700 mb-4">Los sistemas híbridos dominan el mercado actual, combinando lo mejor de cada arquitectura:</p>
+                    <ul class="list-disc pl-6 text-slate-700 space-y-2">
+                        <li><strong>Windows NT:</strong> Kernel monolítico con subsistemas en modo usuario</li>
+                        <li><strong>macOS (XNU):</strong> Combina microkernel Mach con componentes BSD monolíticos</li>
+                        <li><strong>Linux:</strong> Núcleo monolítico pero con capacidades de módulos dinámicos</li>
+                    </ul>
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <h3 class="text-2xl font-bold text-slate-900 mb-4">Conclusión Final</h3>
+                    <p class="text-slate-700 max-w-2xl mx-auto">No existe una arquitectura universalmente superior. La selección depende de los requisitos específicos de rendimiento, seguridad y mantenibilidad. Los sistemas modernos tienden a soluciones híbridas que aprovechan las fortalezas de múltiples enfoques.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-white py-8 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="mb-2">Unidad N° 3: Estructuras de Sistemas Operativos | Creado por Ing. Ronald Sierra</p>
+            <p class="text-slate-400">© 2025 - Experiencia Interactiva de Aprendizaje.</p>
+            <!--<div class="mt-4 flex justify-center space-x-4">
+                <a href="#" class="text-slate-400 hover:text-white">Referencias</a>
+                <a href="#" class="text-slate-400 hover:text-white">Acerca de</a>
+                <a href="#" class="text-slate-400 hover:text-white">Contacto</a>
+            </div>-->
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Navigation
+            const navLinks = document.querySelectorAll('.nav-link');
+            const navLinksMobile = document.querySelectorAll('.nav-link-mobile');
+            const sections = document.querySelectorAll('.section');
+            const archTabs = document.querySelectorAll('.architecture-tab');
+            const menuButton = document.getElementById('menuButton');
+            const mobileMenu = document.getElementById('mobileMenu');
+            const closeMenu = document.getElementById('closeMenu');
+            
+            // Switch between main sections
+            function switchSection(targetId) {
+                sections.forEach(section => {
+                    section.classList.remove('active');
+                    if (section.id === targetId) {
+                        section.classList.add('active');
+                    }
+                });
+                
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.dataset.target === targetId) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+            
+            // Handle main navigation
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    switchSection(this.dataset.target);
+                });
+            });
+            
+            // Handle mobile navigation
+            navLinksMobile.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    switchSection(this.dataset.target);
+                    mobileMenu.classList.add('hidden');
+                });
+            });
+            
+            // Mobile menu toggle
+            menuButton.addEventListener('click', function() {
+                mobileMenu.classList.remove('hidden');
+            });
+            
+            closeMenu.addEventListener('click', function() {
+                mobileMenu.classList.add('hidden');
+            });
+            
+            // Architecture tabs
+            const architectureData = {
+                monolitica: {
+                    title: 'Arquitectura Monolítica',
+                    description: 'Todo el sistema operativo funciona como un único programa grande en modo kernel. Los componentes están fuertemente entrelazados.',
+                    diagram: `
+                        <div class="flex flex-col items-center mb-6">
+                            <div class="diagram-box monolithic-diagram w-full max-w-md">
+                                <div class="font-bold mb-2">MODO KERNEL</div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="bg-red-200 p-2 rounded">Gestión de Procesos</div>
+                                    <div class="bg-red-200 p-2 rounded">Gestión de Memoria</div>
+                                    <div class="bg-red-200 p-2 rounded">Sistema de Archivos</div>
+                                    <div class="bg-red-200 p-2 rounded">Controladores</div>
+                                </div>
+                                <div class="text-sm mt-2">Comunicación mediante llamadas directas a funciones</div>
+                            </div>
+                        </div>
+                    `,
+                    pros: [
+                        'Alto rendimiento por comunicación directa',
+                        'Diseño inicial más sencillo',
+                        'Acceso directo a recursos de hardware'
+                    ],
+                    cons: [
+                        'Baja fiabilidad (un error tumba todo el sistema)',
+                        'Mantenimiento difícil en código base grande',
+                        'Poca modularidad y extensibilidad'
+                    ],
+                    analogy: {
+                        title: 'Analogía: El Artesano "Todo en Uno"',
+                        content: 'Imagine un relojero solitario que construye un reloj complejo. Él mismo diseña cada pieza, las ensambla y ajusta minuciosamente. Si un pequeño resorte se rompe, todo el reloj deja de funcionar. Modificar el diseño requiere desmontar casi todo el reloj.'
+                    },
+                    examples: ['Linux', 'UNIX', 'MS-DOS']
+                },
+                jerarquica: {
+                    title: 'Arquitectura Jerárquica',
+                    description: 'Organiza el SO en una jerarquía de capas. Cada capa se construye sobre la inferior y proporciona servicios a la superior.',
+                    diagram: `
+                        <div class="flex flex-col items-center mb-6">
+                            <div class="space-y-2 w-full max-w-sm">
+                                <div class="diagram-box layered-diagram">Capa 5: Interfaz de Usuario</div>
+                                <div class="text-center text-xl">↓</div>
+                                <div class="diagram-box layered-diagram">Capa 4: Programas de Usuario</div>
+                                <div class="text-center text-xl">↓</div>
+                                <div class="diagram-box layered-diagram">Capa 3: Gestión de E/S</div>
+                                <div class="text-center text-xl">↓</div>
+                                <div class="diagram-box layered-diagram">Capa 2: Comunicación</div>
+                                <div class="text-center text-xl">↓</div>
+                                <div class="diagram-box layered-diagram">Capa 1: Gestión de Memoria</div>
+                                <div class="text-center text-xl">↓</div>
+                                <div class="diagram-box layered-diagram">Capa 0: Hardware y CPU</div>
+                            </div>
+                        </div>
+                    `,
+                    pros: [
+                        'Mejor modularidad y abstracción',
+                        'Facilidad de depuración por capas',
+                        'Mantenimiento más fácil al aislar componentes'
+                    ],
+                    cons: [
+                        'Rendimiento más lento por paso entre capas',
+                        'Diseño óptimo complejo',
+                        'Potenciales cuellos de botella'
+                    ],
+                    analogy: {
+                        title: 'Analogía: Organización Militar',
+                        content: 'Piense en un ejército. El General (Aplicación) da una orden al Coronel (Capa Alta). El Coronel desglosa la orden y la pasa al Mayor (Capa Media). El Mayor se la pasa al Sargento (Capa Baja). El Sargento instruye a los Soldados (Hardware). Cada nivel solo se comunica con su inmediato superior/inferior.'
+                    },
+                    examples: ['THE System', 'MULTICS', 'Windows NT (influencias)']
+                },
+                clienteservidor: {
+                    title: 'Arquitectura Cliente-Servidor',
+                    description: 'Minimiza las funciones en modo kernel (microkernel). Los servicios del SO se implementan como procesos servidores en modo usuario.',
+                    diagram: `
+                        <div class="flex flex-col items-center mb-6">
+                            <div class="relative w-full max-w-md h-64">
+                                <div class="absolute top-0 left-0 w-full text-center font-bold mb-2">MODO USUARIO</div>
+                                <div class="grid grid-cols-2 gap-4 mt-6">
+                                    <div class="diagram-box client-server-diagram">Servidor de Archivos</div>
+                                    <div class="diagram-box client-server-diagram">Servidor de Red</div>
+                                    <div class="diagram-box client-server-diagram">Servidor de Drivers</div>
+                                    <div class="diagram-box client-server-diagram">Servidor de UI</div>
+                                </div>
+                                <div class="text-center text-sm my-2">Comunicación vía IPC (Paso de Mensajes)</div>
+                                <div class="diagram-box client-server-diagram w-1/2 mx-auto">
+                                    <div class="font-bold">Microkernel</div>
+                                    <div class="text-sm">(IPC, Memoria, Hilos)</div>
+                                </div>
+                            </div>
+                        </div>
+                    `,
+                    pros: [
+                        'Alta fiabilidad (fallos aislados)',
+                        'Facilidad de extensión con nuevos servicios',
+                        'Mayor seguridad por mínimo privilegio'
+                    ],
+                    cons: [
+                        'Sobrecarga de rendimiento por IPC',
+                        'Complejidad de comunicación entre procesos',
+                        'Mayor consumo de memoria'
+                    ],
+                    analogy: {
+                        title: 'Analogía: Restaurante con Especialistas',
+                        content: 'Usted (Cliente) le dice al Maître (Microkernel) lo que quiere. El Maître pregunta a la Hostess (Planificación) si hay mesa. Luego pasa su pedido al Chef (Archivos/Procesamiento) y finalmente indica al Camarero (E/S) que sirva. Si el Chef se quema, se llama a otro Chef sin cerrar el restaurante.'
+                    },
+                    examples: ['QNX', 'MINIX 3', 'Mach (macOS)', 'GNU Hurd']
+                }
+            };
+            
+            // Switch architecture tabs
+            function switchArchTab(archName) {
+                archTabs.forEach(tab => {
+                    tab.classList.remove('active');
+                    if (tab.dataset.arch === archName) {
+                        tab.classList.add('active');
+                    }
+                });
+                
+                const data = architectureData[archName];
+                const archContent = document.getElementById('arch-content');
+                
+                archContent.innerHTML = `
+                    <h3 class="text-2xl font-bold text-slate-900 mb-4">${data.title}</h3>
+                    <p class="text-slate-700 mb-6">${data.description}</p>
+                    
+                    ${data.diagram}
+                    
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div class="pros-card p-4 rounded-lg">
+                            <h4 class="text-lg font-bold text-slate-900 mb-3">Ventajas</h4>
+                            <ul class="list-disc pl-5 text-slate-700 space-y-2">
+                                ${data.pros.map(pro => `<li>${pro}</li>`).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div class="cons-card p-4 rounded-lg">
+                            <h4 class="text-lg font-bold text-slate-900 mb-3">Desventajas</h4>
+                            <ul class="list-disc pl-5 text-slate-700 space-y-2">
+                                ${data.cons.map(con => `<li>${con}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="analogy-card p-4 rounded-lg mb-6">
+                        <h4 class="text-lg font-bold text-slate-900 mb-2">${data.analogy.title}</h4>
+                        <p class="text-slate-700">${data.analogy.content}</p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-lg font-bold text-slate-900 mb-3">Ejemplos Notables</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${data.examples.map(example => `
+                                <span class="bg-slate-200 text-slate-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    ${example}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            archTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    switchArchTab(this.dataset.arch);
+                });
+            });
+            
+            // Initialize first architecture
+            switchArchTab('monolitica');
+            
+            // Timeline functionality
+            const timelineItems = document.querySelectorAll('.timeline-item');
+            
+            timelineItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                });
+            });
+            
+            // Accordion functionality
+            const accordions = document.querySelectorAll('.accordion');
+            
+            accordions.forEach(accordion => {
+                const header = accordion.querySelector('.accordion-header');
+                
+                header.addEventListener('click', function() {
+                    accordion.classList.toggle('active');
+                });
+            });
+            
+            // Radar Chart
+            const radarCtx = document.getElementById('comparisonRadarChart').getContext('2d');
+            const radarData = {
+                labels: ['Rendimiento', 'Fiabilidad', 'Seguridad', 'Modularidad', 'Mantenibilidad', 'Flexibilidad'],
+                datasets: [
+                    {
+                        label: 'Monolítica',
+                        data: [5, 1, 1, 2, 1, 2],
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                    },
+                    {
+                        label: 'Jerárquica',
+                        data: [2, 3, 3, 4, 4, 3],
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                    },
+                    {
+                        label: 'Cliente-Servidor',
+                        data: [2, 5, 4, 5, 4, 5],
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                    }
+                ]
+            };
+            
+            const radarChart = new Chart(radarCtx, {
+                type: 'radar',
+                data: radarData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                            pointLabels: {
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#334155'
+                            },
+                            ticks: {
+                                display: false,
+                                beginAtZero: true,
+                                max: 5,
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    const valueMap = ['N/A', 'Baja', 'Media', 'Alta', 'Muy Alta', 'Excelente'];
+                                    label += valueMap[context.raw] || context.raw;
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
